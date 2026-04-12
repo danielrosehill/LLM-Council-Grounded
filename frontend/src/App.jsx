@@ -72,11 +72,13 @@ function App() {
       // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
+        grounding: null,
         stage1: null,
         stage2: null,
         stage3: null,
         metadata: null,
         loading: {
+          grounding: false,
           stage1: false,
           stage2: false,
           stage3: false,
@@ -92,6 +94,25 @@ function App() {
       // Send message with streaming
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
+          case 'grounding_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.grounding = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'grounding_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.grounding = event.data;
+              lastMsg.loading.grounding = false;
+              return { ...prev, messages };
+            });
+            break;
+
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];

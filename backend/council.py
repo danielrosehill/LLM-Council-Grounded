@@ -1,8 +1,9 @@
 """3-stage LLM Council orchestration with personality-based members."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from .openrouter import query_personalities_parallel, query_model
 from .config import COUNCIL_MODEL, CHAIRMAN_MODEL, COUNCIL_PERSONALITIES
+from .grounding import retrieve_context, format_context_for_prompt, is_grounding_enabled
 
 
 def get_personality_name(personality_id: str) -> str:
@@ -13,14 +14,27 @@ def get_personality_name(personality_id: str) -> str:
     return personality_id
 
 
-async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(
+    user_query: str,
+    grounding_context: str = "",
+) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council personalities.
 
     Each personality is the same underlying LLM but with a different system prompt
-    that shapes its thinking style.
+    that shapes its thinking style. If grounding context is provided, it is injected
+    into the user message so all personalities deliberate with factual grounding.
     """
-    user_messages = [{"role": "user", "content": user_query}]
+    if grounding_context:
+        grounded_query = (
+            f"{grounding_context}\n\n"
+            f"Using the grounding context above as factual reference, "
+            f"please answer the following question:\n\n{user_query}"
+        )
+    else:
+        grounded_query = user_query
+
+    user_messages = [{"role": "user", "content": grounded_query}]
 
     responses = await query_personalities_parallel(
         COUNCIL_MODEL, COUNCIL_PERSONALITIES, user_messages
@@ -246,8 +260,15 @@ Title:"""
 
 
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
-    """Run the complete 3-stage council process."""
-    stage1_results = await stage1_collect_responses(user_query)
+    """Run the complete 3-stage council process with optional grounding."""
+    # Grounding: planning agent decides sources, then retrieves in parallel
+    grounding_result = {"plan": {}, "pinecone": [], "tavily": []}
+    grounding_context = ""
+    if is_grounding_enabled():
+        grounding_result = await retrieve_context(user_query)
+        grounding_context = format_context_for_prompt(grounding_result)
+
+    stage1_results = await stage1_collect_responses(user_query, grounding_context)
 
     if not stage1_results:
         return [], [], {
@@ -265,7 +286,8 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
 
     metadata = {
         "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings
+        "aggregate_rankings": aggregate_rankings,
+        "grounding": grounding_result,
     }
 
     return stage1_results, stage2_results, stage3_result, metadata

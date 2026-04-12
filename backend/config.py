@@ -90,6 +90,16 @@ COUNCIL_PERSONALITIES = [
     },
 ]
 
+# Pinecone grounding configuration
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "")
+GROUNDING_TOP_K = int(os.getenv("GROUNDING_TOP_K", "5"))
+
+# Tavily web/news search configuration
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
+
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 

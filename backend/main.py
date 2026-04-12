@@ -12,6 +12,7 @@ import os
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .grounding import retrieve_context, format_context_for_prompt, is_grounding_enabled
 from .digest import generate_full_digest, generate_pdf_report, generate_podcast_script, generate_podcast_audio
 
 app = FastAPI(title="LLM Council API")
@@ -139,8 +140,17 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
+            # Grounding: planning agent + Pinecone/Tavily retrieval
+            grounding_result = {"plan": {}, "pinecone": [], "tavily": []}
+            grounding_context = ""
+            if is_grounding_enabled():
+                yield f"data: {json.dumps({'type': 'grounding_start'})}\n\n"
+                grounding_result = await retrieve_context(request.content)
+                grounding_context = format_context_for_prompt(grounding_result)
+                yield f"data: {json.dumps({'type': 'grounding_complete', 'data': grounding_result})}\n\n"
+
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(request.content, grounding_context)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import GroundingPanel from './GroundingPanel';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
@@ -73,6 +74,15 @@ export default function ChatInterface({
               ) : (
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
+
+                  {/* Grounding */}
+                  {msg.loading?.grounding && (
+                    <div className="stage-loading">
+                      <div className="spinner"></div>
+                      <span>Retrieving grounding context...</span>
+                    </div>
+                  )}
+                  {msg.grounding && <GroundingPanel grounding={msg.grounding} />}
 
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (
